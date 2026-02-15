@@ -124,11 +124,19 @@ def calculate_indicator_vif(data, mv_map):
 
 def calculate_fornell_larcker(scores, ave_values):
     lv_correlations = scores.corr()
-    sqrt_ave = np.sqrt(ave_values).reindex(lv_correlations.index)
-    fornell_larcker_matrix = lv_correlations.copy()
-    np.fill_diagonal(fornell_larcker_matrix.values, sqrt_ave)
-    mask = np.triu(np.ones(fornell_larcker_matrix.shape), k=1).astype(bool)
-    fornell_larcker_matrix = fornell_larcker_matrix.where(~mask, np.nan)
+    sqrt_ave = np.sqrt(ave_values)
+    
+    lvs = lv_correlations.columns.tolist()
+    
+    fornell_larcker_matrix = pd.DataFrame(np.nan, index=lvs, columns=lvs)
+    
+    for i, row_lv in enumerate(lvs):
+        for j, col_lv in enumerate(lvs):
+            if j == i:
+                fornell_larcker_matrix.loc[row_lv, col_lv] = sqrt_ave.get(row_lv)
+            elif j < i:
+                fornell_larcker_matrix.loc[row_lv, col_lv] = lv_correlations.loc[row_lv, col_lv]
+    
     return fornell_larcker_matrix
 
 def build_config(data, active_paths):
@@ -358,13 +366,11 @@ def main():
                 for i, r in df.iterrows():
                     for j, v in r.items():
                         if pd.notna(v):
-                            if i == j: # Diagonal
+                            if i == j: 
                                 styled_df.loc[i, j] = 'background-color: yellow; color: black; font-weight: bold;'
                             else:
-                                # Check against diagonal of column j
                                 if abs(v) > df.loc[j, j]:
                                     styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
-                                # Check against diagonal of row i
                                 if abs(v) > df.loc[i, i]:
                                     styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
                 return styled_df
