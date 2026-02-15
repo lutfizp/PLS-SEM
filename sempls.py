@@ -351,11 +351,36 @@ def main():
                 return styles
             st.dataframe(correlations.round(3).style.apply(style_crossloadings, axis=1).format("{:.3f}"), use_container_width=True)
 
+            st.markdown("### Validitas Diskriminan (Kriteria Fornell-Larcker)")
+            try:
+                fornell_larcker_df = pd.read_csv('fornell_larcker.csv', index_col=0)
+                def style_fornell_larcker(df):
+                    styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
+                    for i, r in df.iterrows():
+                        for j, v in r.items():
+                            if pd.notna(v):
+                                if i == j: # Diagonal
+                                    styled_df.loc[i, j] = 'background-color: yellow; color: black; font-weight: bold;'
+                                else:
+                                    if abs(v) > df.loc[j, j]:
+                                        styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
+                    return styled_df
+                st.dataframe(fornell_larcker_df.style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
+            except FileNotFoundError:
+                st.warning("File fornell_larcker.csv tidak ditemukan.")
+
             st.markdown("### Validitas Diskriminan (HTMT Ratio)")
             st.caption("Rule of thumb: < 0.90")
             st.dataframe(htmt_matrix.round(3).style.background_gradient(cmap='Reds', vmin=0.85, vmax=1.0).format("{:.3f}", na_rep=""), use_container_width=True)
 
         with tab2:
+            st.markdown("### Hasil Perhitungan Model Fit")
+            try:
+                model_fit_df = pd.read_csv('model_fit.csv').set_index('Kriteria Model Fit')
+                st.dataframe(model_fit_df)
+            except FileNotFoundError:
+                st.warning("File model_fit.csv tidak ditemukan.")
+        
             st.markdown("### Kualitas Prediksi (R-Square)")
             r_squared_df = inner_sum['r_squared'].reset_index()
             r_squared_df.columns = ['Variabel Dependen', 'R^2']
@@ -373,7 +398,7 @@ def main():
             st.markdown("### Kualitas Prediksi (Q-Square)")
             st.dataframe(indicator_q2_df.round(3).set_index('Variabel').style.format("{:.3f}"))
             
-            st.markdown("### Kolineritas Antar Konstruk (VIF)")
+            st.markdown("### Kolineritas Antar Indikator (VIF)")
             st.dataframe(indicator_vif_df.round(3).set_index('Indikator').style.format("{:.3f}"))
 
         with tab3:
