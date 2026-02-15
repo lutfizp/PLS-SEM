@@ -122,6 +122,15 @@ def calculate_indicator_vif(data, mv_map):
     vif_data["VIF"] = vif_values
     return vif_data
 
+def calculate_fornell_larcker(scores, ave_values):
+    lv_correlations = scores.corr()
+    sqrt_ave = np.sqrt(ave_values).reindex(lv_correlations.index)
+    fornell_larcker_matrix = lv_correlations.copy()
+    np.fill_diagonal(fornell_larcker_matrix.values, sqrt_ave)
+    mask = np.triu(np.ones(fornell_larcker_matrix.shape), k=1).astype(bool)
+    fornell_larcker_matrix = fornell_larcker_matrix.where(~mask, np.nan)
+    return fornell_larcker_matrix
+
 def build_config(data, active_paths):
     structure = c.Structure()
     involved_lvs = set()
@@ -168,6 +177,8 @@ def run_analysis(df, path_definitions):
     inner_sum = plspm_calc.inner_summary()
     unidim = plspm_calc.unidimensionality()
 
+    fornell_larcker_matrix = calculate_fornell_larcker(scores, inner_sum['ave'])
+    
     loadings = plspm_calc.outer_model()
     loadings['Variabel'] = loadings.index.map(mv_map)
 
@@ -241,6 +252,7 @@ def run_analysis(df, path_definitions):
         "loadings": loadings,
         "mv_map": mv_map,
         "htmt_matrix": htmt_matrix,
+        "fornell_larcker_matrix": fornell_larcker_matrix,
         "indicator_vif_df": indicator_vif_df,
         "indicator_q2_df": indicator_q2_df,
         "scores": scores,
@@ -295,6 +307,7 @@ def main():
         loadings = results["loadings"]
         mv_map = results["mv_map"]
         htmt_matrix = results["htmt_matrix"]
+        fornell_larcker_matrix = results["fornell_larcker_matrix"]
         indicator_vif_df = results["indicator_vif_df"]
         indicator_q2_df = results["indicator_q2_df"]
         scores = results["scores"]
@@ -335,8 +348,27 @@ def main():
                 return styles
             st.dataframe(correlations.round(3).style.apply(style_crossloadings, axis=1).format("{:.3f}"), use_container_width=True)
 
-            st.markdown("### Validitas Diskriminan (HTMT Ratio)")
-            st.caption("Rule of thumb: < 0.90")
+            st.markdown("### Fornell-Larcker")
+            
+            def style_fornell_larcker(df):
+                styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
+                for i, r in df.iterrows():
+                    for j, v in r.items():
+                        if pd.notna(v):
+                            if i == j: # Diagonal
+                                styled_df.loc[i, j] = 'background-color: yellow; color: black; font-weight: bold;'
+                            else:
+                                # Check against diagonal of column j
+                                if abs(v) > df.loc[j, j]:
+                                    styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
+                                # Check against diagonal of row i
+                                if abs(v) > df.loc[i, i]:
+                                    styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
+                return styled_df
+
+            st.dataframe(fornell_larcker_matrix.round(3).style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
+
+            st.markdown("### HTMT Ratio")
             st.dataframe(htmt_matrix.round(3).style.background_gradient(cmap='Reds', vmin=0.85, vmax=1.0).format("{:.3f}", na_rep=""), use_container_width=True)
 
         with tab2:
