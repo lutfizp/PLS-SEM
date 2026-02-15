@@ -177,8 +177,6 @@ def run_analysis(df, path_definitions):
     inner_sum = plspm_calc.inner_summary()
     unidim = plspm_calc.unidimensionality()
 
-    fornell_larcker_matrix = calculate_fornell_larcker(scores, inner_sum['ave'])
-    
     loadings = plspm_calc.outer_model()
     loadings['Variabel'] = loadings.index.map(mv_map)
 
@@ -224,6 +222,8 @@ def run_analysis(df, path_definitions):
                 if multiplier != 1:
                     boot_paths.at[idx, 'Original Sample (O)'] *= multiplier
                     boot_paths.at[idx, 't stat.'] *= multiplier
+
+    fornell_larcker_matrix = calculate_fornell_larcker(scores, inner_sum['ave'])
 
     f2_values = []
     orig_r2 = inner_sum['r_squared']
@@ -331,7 +331,7 @@ def main():
                 return 'background-color: yellow; color: black;' if val >= 0.708 else 'background-color: red; color: black;'
             st.dataframe(outer_loadings_pivoted.round(3).style.applymap(style_primary_loading).format("{:.3f}", na_rep=""), use_container_width=True)
 
-            st.markdown("### Validitas Diskriminan (Cross-Loadings)")
+            st.markdown("### VCross-Loadings")
             all_data_for_corr = pd.concat([df[all_indicators], scores], axis=1)
             correlations = all_data_for_corr.corr().loc[all_indicators, all_lvs]
             correlations.to_csv('cross_loadings.csv')
@@ -348,7 +348,10 @@ def main():
                 return styles
             st.dataframe(correlations.round(3).style.apply(style_crossloadings, axis=1).format("{:.3f}"), use_container_width=True)
 
-            st.markdown("### Fornell-Larcker")
+            st.markdown("###  Fornell-Larcker Criterion")            
+            lvs_order = ['BI', 'EE', 'FC', 'H', 'HM', 'PE', 'PR', 'PV', 'SI', 'UB']
+            lvs_present_in_order = [lv for lv in lvs_order if lv in fornell_larcker_matrix.index]
+            fornell_larcker_ordered = fornell_larcker_matrix.reindex(index=lvs_present_in_order, columns=lvs_present_in_order)
             
             def style_fornell_larcker(df):
                 styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
@@ -366,9 +369,9 @@ def main():
                                     styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
                 return styled_df
 
-            st.dataframe(fornell_larcker_matrix.round(3).style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
+            st.dataframe(fornell_larcker_ordered.round(3).style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
 
-            st.markdown("### HTMT Ratio")
+            st.markdown("### Validitas Diskriminan (HTMT Ratio)")
             st.dataframe(htmt_matrix.round(3).style.background_gradient(cmap='Reds', vmin=0.85, vmax=1.0).format("{:.3f}", na_rep=""), use_container_width=True)
 
         with tab2:
