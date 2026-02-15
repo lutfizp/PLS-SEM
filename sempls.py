@@ -122,6 +122,23 @@ def calculate_indicator_vif(data, mv_map):
     vif_data["VIF"] = vif_values
     return vif_data
 
+def calculate_fornell_larcker(scores, ave_values):
+    lv_correlations = scores.corr()
+    sqrt_ave = np.sqrt(ave_values)
+    
+    lvs = lv_correlations.columns.tolist()
+    
+    fornell_larcker_matrix = pd.DataFrame(np.nan, index=lvs, columns=lvs)
+    
+    for i, row_lv in enumerate(lvs):
+        for j, col_lv in enumerate(lvs):
+            if j == i:
+                fornell_larcker_matrix.loc[row_lv, col_lv] = sqrt_ave.get(row_lv)
+            elif j < i:
+                fornell_larcker_matrix.loc[row_lv, col_lv] = lv_correlations.loc[row_lv, col_lv]
+    
+    return fornell_larcker_matrix
+
 def build_config(data, active_paths):
     structure = c.Structure()
     involved_lvs = set()
@@ -214,6 +231,8 @@ def run_analysis(df, path_definitions):
                     boot_paths.at[idx, 'Original Sample (O)'] *= multiplier
                     boot_paths.at[idx, 't stat.'] *= multiplier
 
+    fornell_larcker_matrix = calculate_fornell_larcker(scores, inner_sum['ave'])
+
     f2_values = []
     orig_r2 = inner_sum['r_squared']
     for i, (src, dst) in enumerate(path_definitions):
@@ -241,6 +260,7 @@ def run_analysis(df, path_definitions):
         "loadings": loadings,
         "mv_map": mv_map,
         "htmt_matrix": htmt_matrix,
+        "fornell_larcker_matrix": fornell_larcker_matrix,
         "indicator_vif_df": indicator_vif_df,
         "indicator_q2_df": indicator_q2_df,
         "scores": scores,
@@ -295,6 +315,7 @@ def main():
         loadings = results["loadings"]
         mv_map = results["mv_map"]
         htmt_matrix = results["htmt_matrix"]
+        fornell_larcker_matrix = results["fornell_larcker_matrix"]
         indicator_vif_df = results["indicator_vif_df"]
         indicator_q2_df = results["indicator_q2_df"]
         scores = results["scores"]
@@ -318,7 +339,7 @@ def main():
                 return 'background-color: yellow; color: black;' if val >= 0.708 else 'background-color: red; color: black;'
             st.dataframe(outer_loadings_pivoted.round(3).style.applymap(style_primary_loading).format("{:.3f}", na_rep=""), use_container_width=True)
 
-            st.markdown("### Validitas Diskriminan (Cross-Loadings)")
+            st.markdown("### VCross-Loadings")
             all_data_for_corr = pd.concat([df[all_indicators], scores], axis=1)
             correlations = all_data_for_corr.corr().loc[all_indicators, all_lvs]
             correlations.to_csv('cross_loadings.csv')
@@ -335,8 +356,28 @@ def main():
                 return styles
             st.dataframe(correlations.round(3).style.apply(style_crossloadings, axis=1).format("{:.3f}"), use_container_width=True)
 
+            st.markdown("###  Fornell-Larcker Criterion")            
+            lvs_order = ['BI', 'EE', 'FC', 'H', 'HM', 'PE', 'PR', 'PV', 'SI', 'UB']
+            lvs_present_in_order = [lv for lv in lvs_order if lv in fornell_larcker_matrix.index]
+            fornell_larcker_ordered = fornell_larcker_matrix.reindex(index=lvs_present_in_order, columns=lvs_present_in_order)
+            
+            def style_fornell_larcker(df):
+                styled_df = pd.DataFrame('', index=df.index, columns=df.columns)
+                for i, r in df.iterrows():
+                    for j, v in r.items():
+                        if pd.notna(v):
+                            if i == j: 
+                                styled_df.loc[i, j] = 'background-color: yellow; color: black; font-weight: bold;'
+                            else:
+                                if abs(v) > df.loc[j, j]:
+                                    styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
+                                if abs(v) > df.loc[i, i]:
+                                    styled_df.loc[i, j] = 'background-color: #f8d7da; color: black;'
+                return styled_df
+
+            st.dataframe(fornell_larcker_ordered.round(3).style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
+
             st.markdown("### Validitas Diskriminan (HTMT Ratio)")
-            st.caption("Rule of thumb: < 0.90")
             st.dataframe(htmt_matrix.round(3).style.background_gradient(cmap='Reds', vmin=0.85, vmax=1.0).format("{:.3f}", na_rep=""), use_container_width=True)
 
         with tab2:
