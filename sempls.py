@@ -391,7 +391,7 @@ def main():
 
     except Exception as e:
         st.error(f"Terjadi kesalahan sistem: {e}")
-        st.exception(e)
+        st.exception(e) 
 
 if __name__ == "__main__":
     main()
