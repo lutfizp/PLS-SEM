@@ -124,9 +124,16 @@ def calculate_indicator_vif(data, mv_map):
 
     for lv, indicators in lv_to_indicators.items():
         if len(indicators) > 1:
-            block_data = data[indicators]
             for i, indicator_name in enumerate(indicators):
-                vif = variance_inflation_factor(block_data.values, i)
+                y = data[indicator_name]
+                x_indicators = [ind for ind in indicators if ind != indicator_name]
+                X = data[x_indicators]
+                X = sm.add_constant(X)
+                
+                model = sm.OLS(y, X).fit()
+                r_squared = model.rsquared
+                
+                vif = 1 / (1 - r_squared) if r_squared < 1.0 else np.inf
                 vif_results.append({'Indikator': indicator_name, 'VIF': vif})
     
     return pd.DataFrame(vif_results)
