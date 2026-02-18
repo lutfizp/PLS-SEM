@@ -256,7 +256,7 @@ def run_analysis(df, path_definitions):
     final_results.rename(columns={'Path': 'Hubungan'}, inplace=True)
     
     # Sort by hypothesis number
-    final_results['H_num'] = final_results['Hipotesis'].str.extract('(\d+)').astype(int)
+    final_results['H_num'] = final_results['Hipotesis'].str.extract(r'(\d+)').astype(int)
     final_results = final_results.sort_values('H_num').drop(columns=['H_num'])
 
     # Reorder columns
