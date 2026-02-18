@@ -245,7 +245,25 @@ def run_analysis(df, path_definitions):
     final_results = pd.merge(boot_paths, pd.DataFrame(f2_values), on='Path', how='left')
     if 't stat.' in final_results.columns:
         final_results['t stat.'] = final_results['t stat.'].abs()
-    final_results.to_csv('path_results.csv')
+
+    hipotesis_map = {
+        "PR -> BI": "H1", "FC -> UB": "H2", "H -> UB": "H3", "BI -> UB": "H4",
+        "PE -> BI": "H5", "EE -> BI": "H6", "SI -> BI": "H7", "FC -> BI": "H8",
+        "HM -> BI": "H9", "PV -> BI": "H10", "H -> BI": "H11"
+    }
+    
+    final_results['Hipotesis'] = final_results['Path'].map(hipotesis_map)
+    final_results.rename(columns={'Path': 'Hubungan'}, inplace=True)
+    
+    # Sort by hypothesis number
+    final_results['H_num'] = final_results['Hipotesis'].str.extract('(\d+)').astype(int)
+    final_results = final_results.sort_values('H_num').drop(columns=['H_num'])
+
+    # Reorder columns
+    cols = ['Hipotesis', 'Hubungan'] + [col for col in final_results.columns if col not in ['Hipotesis', 'Hubungan']]
+    final_results = final_results[cols]
+    
+    final_results.to_csv('path_results.csv', index=False)
 
     indicator_vif_df = calculate_indicator_vif(df, mv_map)
     indicator_q2_df = calculate_indicator_q2(df, scores, path_definitions, mv_map)
@@ -404,7 +422,7 @@ def main():
 
         with tab3:
             st.markdown("### Pengujian Hipotesis")
-            cols_candidate = ['Jalur', 'Original Sample (O)', 'Standard Deviation', 't stat.', 'P-Values', 'Keputusan', 'f2']
+            cols_candidate = ['Hipotesis', 'Hubungan', 'Original Sample (O)', 'Standard Deviation', 't stat.', 'P-Values', 'Keputusan', 'f2']
             cols_show = [c for c in final_results.columns if c in cols_candidate]
             
             def color_res(val):
