@@ -26,7 +26,7 @@ def get_logger(name):
 
 logger = get_logger(__name__)
 
-st.set_page_config(page_title="Dashboard Analisis PLS-SEM", layout="wide")
+st.set_page_config(page_title="PLS-SEM Analysis Dashboard", layout="wide")
 
 st.markdown("""
 <style>
@@ -36,7 +36,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Dashboard Analisis PLS-SEM (Final)")
+st.title("PLS-SEM Analysis Dashboard")
 
 def get_optimal_processes(bootstrap_iterations):
     n_cores = os.cpu_count()
@@ -52,7 +52,7 @@ def load_data():
         data.columns = data.columns.str.strip()
         return data
     except Exception as e:
-        st.error(f"Gagal memuat data: {e}")
+        st.error(f"Failed to load data: {e}")
         return None
 
 def calculate_htmt(data, mv_map):
@@ -110,7 +110,7 @@ def calculate_indicator_q2(data, scores, structure_paths, mv_map):
                 sso += np.sum((y_test - np.mean(y_train))**2)
                 
             q2_val = 1 - (sse / sso) if sso > 0 else 0
-            q2_results.append({'Variabel': indicator, 'Q²': q2_val})
+            q2_results.append({'Variable': indicator, 'Q²': q2_val})
             
     return pd.DataFrame(q2_results)
 
@@ -134,7 +134,7 @@ def calculate_indicator_vif(data, mv_map):
                 r_squared = model.rsquared
                 
                 vif = 1 / (1 - r_squared) if r_squared < 1.0 else np.inf
-                vif_results.append({'Indikator': indicator_name, 'VIF': vif})
+                vif_results.append({'Indicator': indicator_name, 'VIF': vif})
     
     return pd.DataFrame(vif_results)
 
@@ -171,7 +171,7 @@ def run_analysis(df, path_definitions):
     
     missing_cols = [col for col in mv_map.keys() if col not in df.columns]
     if missing_cols:
-        st.error(f"Kolom berikut tidak ditemukan di data: {', '.join(missing_cols)}")
+        st.error(f"The following columns were not found in the data: {', '.join(missing_cols)}")
         st.stop()
 
     bootstrap_iterations = 5000
@@ -185,11 +185,11 @@ def run_analysis(df, path_definitions):
     unidim = plspm_calc.unidimensionality()
 
     loadings = plspm_calc.outer_model()
-    loadings['Variabel'] = loadings.index.map(mv_map)
+    loadings['Variable'] = loadings.index.map(mv_map)
 
     htmt_matrix = calculate_htmt(df, mv_map)
     
-    boot_paths = boot_results.paths().reset_index().rename(columns={'index': 'Jalur'})
+    boot_paths = boot_results.paths().reset_index().rename(columns={'index': 'Path'})
     
     std_cols = [col for col in boot_paths.columns if 'std' in col.lower() or 'error' in col.lower()]
     if std_cols:
@@ -209,17 +209,17 @@ def run_analysis(df, path_definitions):
     lvs_to_flip = []
     all_lvs = sorted(list(set(mv_map.values())))
     for lv in all_lvs:
-        lv_loads = loadings[loadings['Variabel'] == lv]['loading']
+        lv_loads = loadings[loadings['Variable'] == lv]['loading']
         if lv_loads.mean() < 0:
             lvs_to_flip.append(lv)
     
     if lvs_to_flip:
         for lv in lvs_to_flip:
-            loadings.loc[loadings['Variabel'] == lv, 'loading'] *= -1
+            loadings.loc[loadings['Variable'] == lv, 'loading'] *= -1
             scores[lv] *= -1
 
         for idx, row in boot_paths.iterrows():
-            path_str = row['Jalur']
+            path_str = row['Path']
             if "->" in path_str:
                 src, dst = path_str.split(" -> ")
                 multiplier = 1
@@ -240,9 +240,9 @@ def run_analysis(df, path_definitions):
         r2_incl = orig_r2.get(dst, 0)
         r2_excl = temp_calc.inner_summary()['r_squared'].get(dst, 0)
         f2 = (r2_incl - r2_excl) / (1 - r2_incl) if (1 - r2_incl) != 0 else 0
-        f2_values.append({'Jalur': f"{src} -> {dst}", 'f2': abs(f2)})
+        f2_values.append({'Path': f"{src} -> {dst}", 'f2': abs(f2)})
         
-    final_results = pd.merge(boot_paths, pd.DataFrame(f2_values), on='Jalur', how='left')
+    final_results = pd.merge(boot_paths, pd.DataFrame(f2_values), on='Path', how='left')
     if 't stat.' in final_results.columns:
         final_results['t stat.'] = final_results['t stat.'].abs()
     final_results.to_csv('path_results.csv')
@@ -264,25 +264,25 @@ def run_analysis(df, path_definitions):
 
 def run_analysis_with_progress(df, path_definitions):
     progress_bar = st.progress(0)
-    st.info("Memulai analisis PLS-SEM...")
-    logger.info("Memulai analisis PLS-SEM...")
+    st.info("Starting PLS-SEM analysis...")
+    logger.info("Starting PLS-SEM analysis...")
 
     results = run_analysis(df, path_definitions)
 
-    st.info("Menjalankan bootstrap...")
+    st.info("Running bootstrap...")
     logger.info("Running bootstrap...")
     progress_bar.progress(25)
     
-    st.info("Menghitung HTMT...")
+    st.info("Calculating HTMT...")
     logger.info("Calculating HTMT...")
     progress_bar.progress(50)
 
-    st.info("Menghitung f-squared...")
+    st.info("Calculating f-squared...")
     logger.info("Calculating f-squared...")
     progress_bar.progress(75)
 
-    st.success("Analisis Selesai!")
-    logger.info("Analisis Selesai!")
+    st.success("Analysis Complete!")
+    logger.info("Analysis Complete!")
     progress_bar.progress(100)
 
     return results
@@ -298,9 +298,9 @@ def main():
         ("FC", "UB"), ("H",  "UB"), ("BI", "UB")
     ]
     
-    if st.button("Rerun Perhitungan"):
+    if st.button("Rerun"):
         st.cache_data.clear()
-        st.success("Cache telah dibersihkan, perhitungan akan diulang.")
+        st.success("Cache has been cleared, recalculating.")
 
     try:
         results = run_analysis_with_progress(df, path_definitions)
@@ -315,16 +315,16 @@ def main():
         indicator_q2_df = results["indicator_q2_df"]
         scores = results["scores"]
         
-        tab1, tab2, tab3 = st.tabs(["1. Model Pengukuran (Outer Model)", "2. Model Struktural (Inner Model)", "3. Pengujian Hipotesis"])
+        tab1, tab2, tab3 = st.tabs(["1. Measurement Model (Outer Model)", "2. Structural Model (Inner Model)", "3. Hypothesis Testing"])
 
         with tab1:
-            st.markdown("### Validitas Konvergen & Reliabilitas")
+            st.markdown("### Convergent Validity & Reliability")
             rel = pd.concat([unidim[['cronbach_alpha', 'dillon_goldstein_rho']], inner_sum['ave']], axis=1)
             rel.columns = ["Cronbach's Alpha", "Composite Reliability", "AVE"]
             st.dataframe(rel.round(3).style.format("{:.3f}"))
 
             st.markdown("### Outer Loadings")
-            outer_loadings_pivoted = loadings.pivot_table(index=loadings.index, columns='Variabel', values='loading')
+            outer_loadings_pivoted = loadings.pivot_table(index=loadings.index, columns='Variable', values='loading')
             all_lvs = sorted(list(set(mv_map.values())))
             all_indicators = sorted(list(mv_map.keys()))
             outer_loadings_pivoted = outer_loadings_pivoted.reindex(index=all_indicators, columns=all_lvs)
@@ -334,7 +334,7 @@ def main():
                 return 'background-color: yellow; color: black;' if val >= 0.708 else 'background-color: red; color: black;'
             st.dataframe(outer_loadings_pivoted.round(3).style.applymap(style_primary_loading).format("{:.3f}", na_rep=""), use_container_width=True)
 
-            st.markdown("### Validitas Diskriminan (Cross-Loadings)")
+            st.markdown("### Discriminant Validity (Cross-Loadings)")
             all_data_for_corr = pd.concat([df[all_indicators], scores], axis=1)
             correlations = all_data_for_corr.corr().loc[all_indicators, all_lvs]
             correlations.to_csv('cross_loadings.csv')
@@ -351,7 +351,7 @@ def main():
                 return styles
             st.dataframe(correlations.round(3).style.apply(style_crossloadings, axis=1).format("{:.3f}"), use_container_width=True)
 
-            st.markdown("### Validitas Diskriminan (Kriteria Fornell-Larcker)")
+            st.markdown("### Discriminant Validity (Fornell-Larcker Criterion)")
             try:
                 fornell_larcker_df = pd.read_csv('fornell_larcker.csv', index_col=0)
                 def style_fornell_larcker(df):
@@ -367,23 +367,24 @@ def main():
                     return styled_df
                 st.dataframe(fornell_larcker_df.style.apply(style_fornell_larcker, axis=None).format("{:.3f}", na_rep=""), use_container_width=True)
             except FileNotFoundError:
-                st.warning("File fornell_larcker.csv tidak ditemukan.")
+                st.warning("fornell_larcker.csv file not found.")
 
-            st.markdown("### Validitas Diskriminan (HTMT Ratio)")
-            st.caption("Rule of thumb: < 0.90")
+            st.markdown("### Discriminant Validity (HTMT Ratio)")
             st.dataframe(htmt_matrix.round(3).style.background_gradient(cmap='Reds', vmin=0.85, vmax=1.0).format("{:.3f}", na_rep=""), use_container_width=True)
 
         with tab2:
-            st.markdown("### Hasil Perhitungan Model Fit")
+            st.markdown("### Model Fit Results")
             try:
-                model_fit_df = pd.read_csv('model_fit.csv').set_index('Kriteria Model Fit')
+                model_fit_df = pd.read_csv('model_fit.csv')
+                model_fit_df.columns = ['Model Fit Criteria', 'Threshold', 'Saturated model', 'Estimated model', 'Description']
+                model_fit_df = model_fit_df.set_index('Model Fit Criteria')
                 st.dataframe(model_fit_df)
             except FileNotFoundError:
-                st.warning("File model_fit.csv tidak ditemukan.")
+                st.warning("model_fit.csv file not found.")
         
-            st.markdown("### Kualitas Prediksi (R-Square)")
+            st.markdown("### Prediction Quality (R-Square)")
             r_squared_df = inner_sum['r_squared'].reset_index()
-            r_squared_df.columns = ['Variabel Dependen', 'R^2']
+            r_squared_df.columns = ['Dependent Variable', 'R^2']
             r_squared_df = r_squared_df[r_squared_df['R^2'] > 0.001]
             
             def get_r2_keterangan(r2):
@@ -392,14 +393,14 @@ def main():
                 elif r2 >= 0.25: return "Lemah"
                 return "Sangat Lemah"
             
-            r_squared_df['Keterangan'] = r_squared_df['R^2'].apply(get_r2_keterangan)
-            st.dataframe(r_squared_df.round(3).set_index('Variabel Dependen').style.format({'R^2': '{:.3f}'}))
+            r_squared_df['Description'] = r_squared_df['R^2'].apply(get_r2_keterangan)
+            st.dataframe(r_squared_df.round(3).set_index('Dependent Variable').style.format({'R^2': '{:.3f}'}))
             
-            st.markdown("### Kualitas Prediksi (Q-Square)")
-            st.dataframe(indicator_q2_df.round(3).set_index('Variabel').style.format("{:.3f}"))
+            st.markdown("### Prediction Quality (Q-Square)")
+            st.dataframe(indicator_q2_df.round(3).set_index('Variable').style.format("{:.3f}"))
             
-            st.markdown("### Kolineritas Antar Indikator (VIF)")
-            st.dataframe(indicator_vif_df.round(3).set_index('Indikator').style.format("{:.3f}"))
+            st.markdown("### Collinearity Between Indicators (VIF)")
+            st.dataframe(indicator_vif_df.round(3).set_index('Indicator').style.format("{:.3f}"))
 
         with tab3:
             st.markdown("### Pengujian Hipotesis")
@@ -415,8 +416,8 @@ def main():
             }, na_rep="-"), use_container_width=True)
 
     except Exception as e:
-        st.error(f"Terjadi kesalahan sistem: {e}")
-        st.exception(e) 
+        st.error(f"A system error occurred: {e}")
+        st.exception(e)
 
 if __name__ == "__main__":
     main()
